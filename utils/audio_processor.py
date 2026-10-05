@@ -25,6 +25,11 @@ ensure_ffmpeg_on_path()
 import yt_dlp
 from pydub import AudioSegment
 
+
+class YouTubeDownloadError(RuntimeError):
+    """Raised when a YouTube URL cannot be downloaded by the app server."""
+
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Try to use a location with more space (temp directory or local appdata)
@@ -88,10 +93,19 @@ def download_youtube_audio(url: str) -> str:
             raise RuntimeError(f"Downloaded audio was not found at: {filename}")
         return filename
     except yt_dlp.utils.DownloadError as exc:
-        raise RuntimeError(
-            "YouTube download failed. The video may be private, age-restricted, region-blocked, or temporarily blocked by the source. "
-            f"Original error: {exc}"
-        ) from exc
+        details = str(exc)
+        if "sign in to confirm" in details.lower() or "not a bot" in details.lower():
+            message = (
+                "YouTube blocked this request from the app server. Captions were unavailable too. "
+                "Try uploading an audio/video file, or use a video with accessible captions."
+            )
+        else:
+            message = (
+                "YouTube could not provide this video. It may be private, age-restricted, "
+                "region-blocked, or temporarily unavailable. "
+                f"Details: {details}"
+            )
+        raise YouTubeDownloadError(message) from exc
 
 
 def convert_to_wav(input_path: str) -> str:

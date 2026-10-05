@@ -15,3 +15,4 @@ pydantic>=2.8.2
 numpy>=1.26.4
 tqdm>=4.66.5
 pydub>=0.25.1
+youtube-transcript-api>=1.2.3

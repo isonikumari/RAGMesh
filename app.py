@@ -34,8 +34,23 @@ def run_pipeline(source: str, language: str = "english") -> dict:
 
     st.info("Starting AI Video Assistant...")
 
-    chunks = process_input(source)
-    transcript = transcribe_all(chunks, translate=(language != "english"))
+    transcript = None
+    if source.startswith(("https://", "http://")):
+        from utils.youtube_transcript import fetch_youtube_transcript
+
+        st.info("Checking whether this YouTube video has captions...")
+        transcript = fetch_youtube_transcript(
+            source,
+            translate_to_english=(language != "english"),
+        )
+        if transcript:
+            st.success("YouTube captions retrieved.")
+        else:
+            st.info("Captions could not be accessed; trying to download and transcribe the audio.")
+
+    if not transcript:
+        chunks = process_input(source)
+        transcript = transcribe_all(chunks, translate=(language != "english"))
 
     st.success("Transcription completed!")
 
@@ -205,6 +220,10 @@ if source_type == "Paste YouTube link":
         placeholder="https://www.youtube.com/watch?v=...",
         help="Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     )
+    st.caption(
+        "The app tries captions first, then audio download. YouTube may block either "
+        "request from Render; if so, upload the media file instead."
+    )
 else:
     uploaded_file = st.file_uploader(
         "Upload video or audio file",
@@ -227,6 +246,13 @@ if process_button:
         if not youtube_url.strip():
             st.warning("Please paste a valid YouTube URL.")
             st.stop()
+        from utils.youtube_transcript import extract_youtube_video_id
+
+        try:
+            extract_youtube_video_id(youtube_url)
+        except ValueError as exc:
+            st.warning(str(exc))
+            st.stop()
         final_source = youtube_url.strip()
     else:
         if uploaded_file is None:
@@ -244,6 +270,15 @@ if process_button:
                 st.error(
                     "Gemini is rate-limiting this request. Wait a minute and retry. "
                     "If it continues, check your Google Gemini API usage, billing, or API key plan."
+                )
+                st.stop()
+            from utils.audio_processor import YouTubeDownloadError
+
+            if isinstance(exc, YouTubeDownloadError):
+                st.error(str(exc))
+                st.info(
+                    "You can still analyze this content by selecting "
+                    "'Upload local file' and choosing an audio/video file."
                 )
                 st.stop()
             raise

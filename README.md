@@ -7,7 +7,7 @@ The project combines Streamlit for the interface, FFmpeg and `yt-dlp` for media 
 ## Features
 
 - Upload local video/audio files or paste a YouTube link
-- Download and normalize audio from YouTube with `yt-dlp`
+- Try available YouTube captions first, then download and transcribe audio when captions are unavailable
 - Convert media to WAV format and split long recordings into smaller chunks
 - Transcribe chunks with Gemini and combine them into a full transcript
 - Summarize the transcript into a clean, professional outcome
@@ -25,9 +25,9 @@ This app is designed for meetings, lectures, podcasts, interviews, and other spo
 The general workflow is:
 
 1. Input a YouTube URL or local file
-2. Download/convert the media to WAV
-3. Split audio into chunks to keep processing manageable
-4. Transcribe each chunk with Gemini
+2. For YouTube, try available captions first; if unavailable, download/convert the media to WAV
+3. Split downloaded audio into chunks to keep processing manageable
+4. Transcribe each audio chunk with Gemini
 5. Merge transcript chunks into one transcript
 6. Generate a title and summary
 7. Extract action items, decisions, and open questions
@@ -44,6 +44,7 @@ The general workflow is:
 - FFmpeg
 - `yt-dlp`
 - `pydub`
+- `youtube-transcript-api`
 - `python-dotenv`
 
 ## Repository structure
@@ -52,6 +53,7 @@ The general workflow is:
 RAGMesh/
 ├── app.py                  # Main Streamlit UI
 ├── main.py                 # Duplicate entry point / alternate runner
+├── .python-version         # Python version used for deployment
 ├── .env                    # Local environment variables
 ├── .gitignore
 ├── requirements.txt        # Python dependencies
@@ -65,7 +67,8 @@ RAGMesh/
 │   ├── vector_store.py     # ChromaDB vector helper utilities
 │   └── __pycache__
 ├── utils/
-│   └── audio_processor.py  # Download, conversion, chunking, and cleanup logic
+│   ├── audio_processor.py  # Download, conversion, chunking, and cleanup logic
+│   └── youtube_transcript.py # Caption retrieval and YouTube URL parsing
 ├── vector_db/              # ChromaDB persistence directory
 └── README.MD
 ```
@@ -147,10 +150,10 @@ Then open the local browser URL shown in the terminal (usually `http://localhost
 ## How the pipeline works
 
 ### 1. Media processing
-The app accepts either a YouTube URL or a local file. It downloads or converts the media into WAV format and splits it into smaller chunks for manageable transcription.
+The app accepts either a YouTube URL or a local file. For YouTube URLs, it first tries to retrieve captions with `youtube-transcript-api`; if captions cannot be accessed, it falls back to `yt-dlp` audio download and Gemini transcription. Local media is converted into WAV format and split into smaller chunks for manageable transcription.
 
 ### 2. Transcription
-Each audio chunk is sent to Gemini using a transcription prompt. The app can optionally translate non-English audio into English before summarization and analysis.
+When captions are available, they are used directly. Otherwise, each audio chunk is sent to Gemini using a transcription prompt. The app can optionally translate non-English content into English before summarization and analysis.
 
 ### 3. Analysis and summarization
 The combined transcript is passed through prompts that:
@@ -170,6 +173,7 @@ The cleaned transcript is chunked, embedded, and stored in ChromaDB. User questi
 - The RAG layer filters clearly irrelevant personal chatter or social remarks so that answers stay focused on business context.
 - Gemini rate limits may occur under heavy usage; the app includes retry logic and a rate-limit check.
 - If YouTube content is private, region-blocked, or unsupported, download may fail.
+- YouTube may block requests from cloud-hosted IP addresses. Caption retrieval and audio download are best-effort on Render; when both are blocked, upload the media file instead.
 
 ## Deployment
 
