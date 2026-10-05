@@ -36,7 +36,7 @@ The general workflow is:
 
 ## Tech stack
 
-- Python 3.11+
+- Python 3.12.10 (pinned for Render; Python 3.13+ removes the `audioop` module used by `pydub`)
 - Streamlit
 - LangChain
 - ChromaDB
