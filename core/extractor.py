@@ -18,7 +18,7 @@ def build_chain(system_prompt:str):
 
 def extract_action_items(transcript:str)->str:
      chain = build_chain(
-         "You are a expert meeting analyst. FRom the meeting transcript,"
+         "You are an expert content analyst. From the provided source content,"
          "extract all action itens .For each provide :\n"
          "-TAsk description\n"
          "-Owner (who is responsible)\n"
@@ -30,7 +30,7 @@ def extract_action_items(transcript:str)->str:
 
 def extract_question(transcript:str)-> str:
     chain= build_chain(
-        "from the meeting transcript,extract all unsolved question"
+        "From the provided source content, extract all unresolved questions"
         "or topics needing follow-up. Format as a numbered list."
         "If none found say 'no open question found ."
 
@@ -39,7 +39,7 @@ def extract_question(transcript:str)-> str:
 
 def extract_key_decisions(transcript:str)->str:
     chain=build_chain(
-        "You are a meeting analyst. From the meeting transcript,"
+        "You are a content analyst. From the provided source content,"
         "extract all key decisions made . Format as a numbered list."
         "If None found say 'No open questions found "
     )

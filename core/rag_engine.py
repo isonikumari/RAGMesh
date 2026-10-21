@@ -48,7 +48,7 @@ def build_rag_chain(transcript:str):
   llm=get_llm()
 
   prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are an expert meeting assistant. Answer the user's question using only the business-relevant meeting summary/context provided below.
+    ("system", """You are an expert content assistant. Answer the user's question using only the relevant source summary/context provided below.
       Ignore unrelated personal chatter, appearance comments, insults, gossip, or social remarks that are not part of the business discussion.
       If the answer is a number, date, amount, or percentage, return the exact value from the summary without replacing it with X or a generic placeholder.
       If the answer is not present in the provided summary, say it is not present in the current summary.
@@ -78,7 +78,7 @@ def load_rag_chain(transcript: str | None = None):
   llm = get_llm()
 
   prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are an expert meeting assistant. Answer the user's question using only the business-relevant meeting summary/context provided below.
+    ("system", """You are an expert content assistant. Answer the user's question using only the relevant source summary/context provided below.
       Ignore unrelated personal chatter, appearance comments, insults, gossip, or social remarks that are not part of the business discussion.
       If the answer is a number, date, amount, or percentage, return the exact value from the summary without replacing it with X or a generic placeholder.
       If the answer is not present in the provided summary, say it is not present in the current summary.

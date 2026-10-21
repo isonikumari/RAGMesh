@@ -32,10 +32,26 @@ def run_pipeline(source: str, language: str = "english") -> dict:
     from core.transcriber import transcribe_all
     from utils.audio_processor import process_input
 
-    st.info("Starting AI Video Assistant...")
+    st.info("Starting content analysis...")
 
     transcript = None
-    if source.startswith(("https://", "http://")):
+    is_pdf = Path(source).suffix.lower() == ".pdf"
+    progress_bar = st.progress(0, text="Preparing PDF analysis...") if is_pdf else None
+
+    if is_pdf:
+        from utils.pdf_processor import extract_pdf_text
+
+        st.info("Extracting text from the PDF...")
+        def update_pdf_progress(page_number: int, total_pages: int) -> None:
+            if progress_bar is not None:
+                progress_bar.progress(
+                    0.1 * page_number / total_pages,
+                    text=f"Extracting PDF text: page {page_number} of {total_pages}",
+                )
+
+        transcript = extract_pdf_text(source, progress_callback=update_pdf_progress)
+        st.success("PDF text extracted.")
+    elif source.startswith(("https://", "http://")):
         from utils.youtube_transcript import fetch_youtube_transcript
 
         st.info("Checking whether this YouTube video has captions...")
@@ -52,13 +68,37 @@ def run_pipeline(source: str, language: str = "english") -> dict:
         chunks = process_input(source)
         transcript = transcribe_all(chunks, translate=(language != "english"))
 
-    st.success("Transcription completed!")
+    if not is_pdf:
+        st.success("Transcription completed!")
 
+    if progress_bar is not None:
+        progress_bar.progress(0.12, text="Generating a title...")
     title = generate_title(transcript)
-    summary = summarize(transcript)
+    if progress_bar is not None:
+        progress_bar.progress(0.15, text="Summarizing PDF content...")
+
+    def update_summary_progress(chunk_number: int, total_chunks: int) -> None:
+        if progress_bar is not None:
+            progress_bar.progress(
+                0.15 + 0.6 * chunk_number / total_chunks,
+                text=f"Summarizing PDF content: section {chunk_number} of {total_chunks}",
+            )
+
+    summary = summarize(
+        transcript,
+        progress_callback=update_summary_progress if is_pdf else None,
+    )
+    if progress_bar is not None:
+        progress_bar.progress(0.76, text="Extracting action items...")
     action_items = extract_action_items(transcript)
+    if progress_bar is not None:
+        progress_bar.progress(0.83, text="Extracting key decisions...")
     decisions = extract_key_decisions(transcript)
+    if progress_bar is not None:
+        progress_bar.progress(0.90, text="Finding open questions...")
     questions = extract_question(transcript)
+    if progress_bar is not None:
+        progress_bar.progress(1.0, text="PDF analysis complete.")
 
     return {
         "title": title,
@@ -196,7 +236,7 @@ st.markdown(
     """
     <div class="app-header">
         <h1>🎥 AI Meeting Assistant</h1>
-        <p>Turn any meeting video into notes, key decisions, action items, and instant answers.</p>
+        <p>Turn videos, audio, and PDFs into summaries, key information, action items, and instant answers.</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -209,9 +249,9 @@ uploaded_file = None
 
 source_type = st.radio(
     "Select input type",
-    ["Paste YouTube link", "Upload local file"],
+    ["Paste YouTube link", "Upload file"],
     horizontal=True,
-    help="Choose whether you want to paste a YouTube URL or upload a video/audio file from your computer.",
+    help="Choose whether you want to paste a YouTube URL or upload an audio, video, or PDF file from your computer.",
 )
 
 if source_type == "Paste YouTube link":
@@ -226,9 +266,9 @@ if source_type == "Paste YouTube link":
     )
 else:
     uploaded_file = st.file_uploader(
-        "Upload video or audio file",
-        type=["mp4", "mp3", "wav", "m4a", "mov", "avi", "webm", "mpeg", "ogg"],
-        help="Upload a local audio or video file from your computer.",
+        "Upload audio, video, or PDF file",
+        type=["mp4", "mp3", "wav", "m4a", "mov", "avi", "webm", "mpeg", "ogg", "pdf"],
+        help="Upload audio/video for transcription or a PDF with selectable text for document analysis.",
     )
 
 language = st.selectbox("Language", ["english", "hindi", "other"])
@@ -272,6 +312,11 @@ if process_button:
                     "If it continues, check your Google Gemini API usage, billing, or API key plan."
                 )
                 st.stop()
+            from utils.pdf_processor import PDFExtractionError
+
+            if isinstance(exc, PDFExtractionError):
+                st.error(str(exc))
+                st.stop()
             from utils.audio_processor import YouTubeDownloadError
 
             if isinstance(exc, YouTubeDownloadError):
@@ -284,7 +329,7 @@ if process_button:
             raise
 
     st.session_state["pipeline_result"] = result
-    st.session_state["rag_chain"] = load_rag_chain(result["summary"])
+    st.session_state["rag_chain"] = load_rag_chain(result["transcript"])
     st.session_state["chat_history"] = []
 
 
@@ -333,7 +378,7 @@ if "pipeline_result" in st.session_state:
     if user_question:
         from core.rag_engine import ask_question
 
-        rag_chain = st.session_state.get("rag_chain") or load_rag_chain(result["summary"])
+        rag_chain = st.session_state.get("rag_chain") or load_rag_chain(result["transcript"])
         st.session_state["rag_chain"] = rag_chain
 
         with st.spinner("Thinking..."):

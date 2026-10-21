@@ -6,7 +6,8 @@ The project combines Streamlit for the interface, FFmpeg and `yt-dlp` for media 
 
 ## Features
 
-- Upload local video/audio files or paste a YouTube link
+- Upload local video/audio/PDF files or paste a YouTube link
+- Extract selectable text from PDFs for summaries and questions
 - Try available YouTube captions first, then download and transcribe audio when captions are unavailable
 - Convert media to WAV format and split long recordings into smaller chunks
 - Transcribe chunks with Gemini and combine them into a full transcript
@@ -24,15 +25,16 @@ This app is designed for meetings, lectures, podcasts, interviews, and other spo
 
 The general workflow is:
 
-1. Input a YouTube URL or local file
-2. For YouTube, try available captions first; if unavailable, download/convert the media to WAV
-3. Split downloaded audio into chunks to keep processing manageable
-4. Transcribe each audio chunk with Gemini
-5. Merge transcript chunks into one transcript
-6. Generate a title and summary
-7. Extract action items, decisions, and open questions
-8. Build a vector store from the cleaned transcript
-9. Answer user questions using relevant retrieved context
+1. Input a YouTube URL or upload an audio, video, or PDF file
+2. For PDFs, extract selectable text directly; scanned image-only PDFs are not supported
+3. For YouTube, try available captions first; if unavailable, download/convert the media to WAV
+4. Split downloaded audio into chunks to keep processing manageable
+5. Transcribe each audio chunk with Gemini
+6. Merge transcript chunks or extracted PDF text into one source document
+7. Generate a title and summary
+8. Extract action items, decisions, and open questions
+9. Build a vector store from the cleaned content
+10. Answer user questions using relevant retrieved context
 
 ## Tech stack
 
@@ -212,6 +214,9 @@ Set `GOOGLE_API_KEY` in your environment or `.env` before launching the app.
 
 ### Transcription fails or returns empty output
 Check that the input file is valid, the model name is correct, and your Google API quota/billing is active.
+
+### PDF text extraction fails
+PDF uploads must contain selectable text. Image-only scanned PDFs are not supported because OCR is not enabled; use a text-searchable PDF instead.
 
 ### Rate-limited requests
 If Gemini is rate-limiting you, wait a bit and retry. The app includes a rate-limit detection path and a warning message for that condition.
