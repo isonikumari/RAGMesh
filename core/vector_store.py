@@ -6,7 +6,10 @@ from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
+from dotenv import load_dotenv
+load_dotenv()
 
+DATA_DIR="data"
 CHROMA_DIR = os.path.abspath("vector_db")
 COLLECTION_NAME = "meeting_transcript"
 EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
@@ -66,17 +69,13 @@ def load_vector_store(collection_name: str | None = None) -> Chroma:
 
 def ensure_vector_store(transcript: str, collection_name: str | None = None) -> Chroma:
   collection_name = collection_name or get_collection_name(transcript)
-  try:
-    vector_store = load_vector_store(collection_name)
-    vector_store.get(limit=1)
+  vector_store = load_vector_store(collection_name)
+  if vector_store.get(limit=1).get("ids"):
     return vector_store
-  except Exception:
-    return build_vector_store(transcript, collection_name)
+  return build_vector_store(transcript, collection_name)
 
 
 def get_retriever(vector_store: Chroma, k: int = 10):
   return vector_store.as_retriever(
     search_kwargs={"k": k}
   )
-
-

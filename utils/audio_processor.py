@@ -1,6 +1,5 @@
 import os
 import shutil
-import sys
 
 
 def ensure_ffmpeg_on_path() -> None:
@@ -22,90 +21,7 @@ def ensure_ffmpeg_on_path() -> None:
 
 ensure_ffmpeg_on_path()
 
-import yt_dlp
 from pydub import AudioSegment
-
-
-class YouTubeDownloadError(RuntimeError):
-    """Raised when a YouTube URL cannot be downloaded by the app server."""
-
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-# Try to use a location with more space (temp directory or local appdata)
-# Falls back to project directory if temp not available
-PREFERRED_DOWNLOAD_DIRS = [
-    os.path.join(os.environ.get('TEMP', ''), 'ai_video_downloads'),
-    os.path.join(os.path.expanduser('~'), '.ai_video_assistant', 'downloads'),
-    os.path.join(PROJECT_ROOT, 'downloades')
-]
-
-DOWNLOAD_DIR = None
-for dir_path in PREFERRED_DOWNLOAD_DIRS:
-    try:
-        if dir_path and os.path.dirname(dir_path):
-            os.makedirs(dir_path, exist_ok=True)
-            # Test if we can write to this directory
-            test_file = os.path.join(dir_path, '.test_write')
-            with open(test_file, 'w') as f:
-                f.write('test')
-            os.remove(test_file)
-            DOWNLOAD_DIR = dir_path
-            print(f"Using download directory: {DOWNLOAD_DIR}")
-            break
-    except (OSError, Exception):
-        continue
-
-if DOWNLOAD_DIR is None:
-    # Fallback to project directory
-    DOWNLOAD_DIR = os.path.join(PROJECT_ROOT, 'downloades')
-    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-    print(f"Fallback download directory: {DOWNLOAD_DIR}")
-
-
-def download_youtube_audio(url: str) -> str:
-    output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": output_path,
-        "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["web", "android", "tv_embedded"],
-            }
-        },
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-        },
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "wav",
-            "preferredquality": "192",
-        }],
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-        filename = os.path.splitext(ydl.prepare_filename(info))[0] + ".wav"
-        if not os.path.isfile(filename):
-            raise RuntimeError(f"Downloaded audio was not found at: {filename}")
-        return filename
-    except yt_dlp.utils.DownloadError as exc:
-        details = str(exc)
-        if "sign in to confirm" in details.lower() or "not a bot" in details.lower():
-            message = (
-                "YouTube blocked this request from the app server. Captions were unavailable too. "
-                "Try uploading an audio/video file, or use a video with accessible captions."
-            )
-        else:
-            message = (
-                "YouTube could not provide this video. It may be private, age-restricted, "
-                "region-blocked, or temporarily unavailable. "
-                f"Details: {details}"
-            )
-        raise YouTubeDownloadError(message) from exc
 
 
 def convert_to_wav(input_path: str) -> str:
@@ -150,13 +66,6 @@ def chunk_audio(wav_path: str, chunk_minutes: int = 5) -> list[str]:
     return chunks
 
 
-if __name__ == "__main__":
-    video_url = sys.argv[1] if len(sys.argv) > 1 else "https://www.youtube.com/watch?v=OYvlznJ4IZQ"
-    data = download_youtube_audio(video_url)
-    converted_path = convert_to_wav(data)
-    # print(converted_path)
-    # print(chunk_audio(converted_path))
-
 def cleanup_old_files(directory: str = None, pattern: str = "_chunk_") -> int:
     """Clean up old audio chunk files to free disk space.
     
@@ -187,18 +96,16 @@ def cleanup_old_files(directory: str = None, pattern: str = "_chunk_") -> int:
 
 
 def process_input(source: str) -> list[str]:
-    """Download or convert an input file, then split it into audio chunks."""
-    # Clean up old chunks before starting
+    """Convert a local audio/video file and split it into audio chunks."""
+    if source.startswith(("https://", "http://")):
+        raise ValueError("URL inputs are not supported. Upload a local audio or video file.")
+
     cleaned = cleanup_old_files()
     if cleaned > 0:
         print(f"Cleaned up {cleaned} old audio files to free space")
-    
-    if source.startswith(("https://", "http://")):
-        print("Detected YouTube URL. Downloading audio...")
-        wav_path = download_youtube_audio(source)
-    else:
-        print("Detected local file. Converting to WAV...")
-        wav_path = convert_to_wav(source)
+
+    print("Converting local file to WAV...")
+    wav_path = convert_to_wav(source)
 
     print("Chunking audio...")
     try:

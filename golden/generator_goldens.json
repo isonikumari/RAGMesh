@@ -1,0 +1,38 @@
+[
+  {
+    "query": "When does the first customer beta launch, and what is excluded?",
+    "ideal_context": [
+      "The team agreed to launch the first customer beta on July 8. The beta will include the dashboard and CSV export, but not automated billing."
+    ]
+  },
+  {
+    "query": "Who will provide the vendor comparison and when is it due?",
+    "ideal_context": [
+      "Maya will send the vendor comparison to the team by May 12. The comparison should cover implementation time, annual cost, and data residency."
+    ]
+  },
+  {
+    "query": "What is the approved first-phase budget?",
+    "ideal_context": [
+      "The approved budget for the first phase is $18,000. The team will not exceed that amount without approval from the finance lead."
+    ]
+  },
+  {
+    "query": "Who owns the security review, what is its deadline, and what should it cover?",
+    "ideal_context": [
+      "Omar owns the security review and will finish it by May 20. The review must include access controls, dependency scanning, and the incident response checklist."
+    ]
+  },
+  {
+    "query": "What does Priya need to prepare, and by when?",
+    "ideal_context": [
+      "Priya will prepare the customer support guide by June 2. The guide should include account setup, password reset, and how to report a bug."
+    ]
+  },
+  {
+    "query": "How long are uploaded recordings kept, and what happens afterward?",
+    "ideal_context": [
+      "The team decided to retain uploaded meeting recordings for 90 days, then delete them. The transcript and summary can remain available after the recording is deleted."
+    ]
+  }
+]

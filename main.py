@@ -181,60 +181,37 @@ st.markdown(
     """
     <div class="app-header">
         <h1>🎥 AI Meeting Assistant</h1>
-        <p>Turn any meeting video into notes, key decisions, action items, and instant answers.</p>
+        <p>Analyze local audio or video files, then review notes and ask questions about their content.</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-source_type = "Paste YouTube link"
-
-youtube_url = ""
 uploaded_file = None
 
-source_type = st.radio(
-    "Select input type",
-    ["Paste YouTube link", "Upload local file"],
-    horizontal=True,
-    help="Choose whether you want to paste a YouTube URL or upload a video/audio file from your computer.",
+uploaded_file = st.file_uploader(
+    "Upload a local video or audio file",
+    type=["mp4", "mp3", "wav", "m4a", "mov", "avi", "webm", "mpeg", "ogg"],
+    help="Upload an audio or video file from your computer.",
 )
-
-if source_type == "Paste YouTube link":
-    youtube_url = st.text_input(
-        "YouTube URL",
-        placeholder="https://www.youtube.com/watch?v=...",
-        help="Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    )
-else:
-    uploaded_file = st.file_uploader(
-        "Upload video or audio file",
-        type=["mp4", "mp3", "wav", "m4a", "mov", "avi", "webm", "mpeg", "ogg"],
-        help="Upload a local audio or video file from your computer.",
-    )
 
 language = st.selectbox("Language", ["english", "hindi", "other"])
 process_button = st.button("Start Analysis", use_container_width=True, type="primary")
 
 with st.sidebar:
     st.title("⚙️ Settings")
-    st.caption("Use the main section above to enter a link or upload a file.")
+    st.caption("Upload a local media file to get started.")
 
 
 if process_button:
     final_source = None
 
-    if source_type == "Paste YouTube link":
-        if not youtube_url.strip():
-            st.warning("Please paste a valid YouTube URL.")
-            st.stop()
-        final_source = youtube_url.strip()
-    else:
-        if uploaded_file is None:
-            st.warning("Please upload a local video or audio file.")
-            st.stop()
-        final_source = save_uploaded_file(uploaded_file)
+    if uploaded_file is None:
+        st.warning("Please upload a local video or audio file.")
+        st.stop()
+    final_source = save_uploaded_file(uploaded_file)
 
-    with st.spinner("Processing your video and generating results..."):
+    with st.spinner("Processing your file and generating results..."):
         try:
             result = run_pipeline(final_source, language)
         except Exception as exc:

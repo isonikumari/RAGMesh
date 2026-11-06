@@ -2,7 +2,8 @@ import os
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.rate_limiters import InMemoryRateLimiter
-
+from dotenv import load_dotenv
+load_dotenv()
 
 _rate_limiter = InMemoryRateLimiter(
     requests_per_second=float(os.getenv("GEMINI_REQUESTS_PER_SECOND", "0.5")),

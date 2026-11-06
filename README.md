@@ -1,15 +1,14 @@
 # RAGMesh
 
-AI Meeting Assistant is a Python application that ingests a YouTube URL or local audio/video file, converts it into a transcript, summarizes the content, extracts key action items and decisions, and answers questions against the meeting context using a retrieval-augmented generation (RAG) pipeline.
+RAGMesh is a Python application for analyzing uploaded documents and local audio/video files. It extracts text or transcribes speech, summarizes the content, identifies key action items and decisions, and answers questions using a retrieval-augmented generation (RAG) pipeline.
 
-The project combines Streamlit for the interface, FFmpeg and `yt-dlp` for media processing, Google Gemini for transcription and LLM tasks, and ChromaDB for vector-based retrieval.
+The project combines Streamlit for the interface, FFmpeg for local media processing, Google Gemini for transcription and LLM tasks, and ChromaDB for vector-based retrieval.
 
 ## Features
 
-- Upload local video/audio/PDF files or paste a YouTube link
+- Upload a PDF or local video/audio file
 - Extract selectable text from PDFs for summaries and questions
-- Try available YouTube captions first, then download and transcribe audio when captions are unavailable
-- Convert media to WAV format and split long recordings into smaller chunks
+- Convert local media to WAV format and split long recordings into smaller chunks
 - Transcribe chunks with Gemini and combine them into a full transcript
 - Summarize the transcript into a clean, professional outcome
 - Extract:
@@ -25,16 +24,15 @@ This app is designed for meetings, lectures, podcasts, interviews, and other spo
 
 The general workflow is:
 
-1. Input a YouTube URL or upload an audio, video, or PDF file
+1. Upload a PDF, audio file, or video file
 2. For PDFs, extract selectable text directly; scanned image-only PDFs are not supported
-3. For YouTube, try available captions first; if unavailable, download/convert the media to WAV
-4. Split downloaded audio into chunks to keep processing manageable
-5. Transcribe each audio chunk with Gemini
-6. Merge transcript chunks or extracted PDF text into one source document
-7. Generate a title and summary
-8. Extract action items, decisions, and open questions
-9. Build a vector store from the cleaned content
-10. Answer user questions using relevant retrieved context
+3. Convert local audio/video to WAV and split audio into chunks
+4. Transcribe each audio chunk with Gemini
+5. Merge transcript chunks or extracted PDF text into one source document
+6. Generate a title and summary
+7. Extract action items, decisions, and open questions
+8. Build a vector store from the cleaned content
+9. Answer user questions using relevant retrieved context
 
 ## Tech stack
 
@@ -44,9 +42,7 @@ The general workflow is:
 - ChromaDB
 - Google Gemini API
 - FFmpeg
-- `yt-dlp`
 - `pydub`
-- `youtube-transcript-api`
 - `python-dotenv`
 
 ## Repository structure
@@ -69,8 +65,7 @@ RAGMesh/
 │   ├── vector_store.py     # ChromaDB vector helper utilities
 │   └── __pycache__
 ├── utils/
-│   ├── audio_processor.py  # Download, conversion, chunking, and cleanup logic
-│   └── youtube_transcript.py # Caption retrieval and YouTube URL parsing
+│   └── audio_processor.py  # Local media conversion, chunking, and cleanup logic
 ├── vector_db/              # ChromaDB persistence directory
 └── README.MD
 ```
@@ -152,7 +147,7 @@ Then open the local browser URL shown in the terminal (usually `http://localhost
 ## How the pipeline works
 
 ### 1. Media processing
-The app accepts either a YouTube URL or a local file. For YouTube URLs, it first tries to retrieve captions with `youtube-transcript-api`; if captions cannot be accessed, it falls back to `yt-dlp` audio download and Gemini transcription. Local media is converted into WAV format and split into smaller chunks for manageable transcription.
+PDF uploads are read as selectable text. Local audio and video files are converted to WAV and split into smaller chunks for transcription with Gemini.
 
 ### 2. Transcription
 When captions are available, they are used directly. Otherwise, each audio chunk is sent to Gemini using a transcription prompt. The app can optionally translate non-English content into English before summarization and analysis.
@@ -169,13 +164,79 @@ The combined transcript is passed through prompts that:
 ### 4. RAG-powered Q&A
 The cleaned transcript is chunked, embedded, and stored in ChromaDB. User questions are answered by retrieving the most relevant transcript segments and prompting Gemini with the retrieved context.
 
+### Evaluating retrieval
+`evals/eval_retriever.py` evaluates the Chroma retriever with DeepEval's contextual precision and recall metrics. The included transcript and goldens are a small demonstration dataset; replace them with a representative transcript and manually verified questions and answers for your own evaluation.
+
+From the project root, run the retrieval evaluation:
+
+```powershell
+.\.venv\Scripts\python.exe -m evals.eval_retriever
+```
+
+Both Gemini embeddings and the DeepEval judge use `GOOGLE_API_KEY` from `.env`. The judge defaults to `GEMINI_MODEL` (or `gemini-2.0-flash` if unset). The retriever evaluation uses `data/retriever_eval_transcript.txt` and `golden/retriever_goldens.json`.
+
+### Evaluating generation
+Run the generator evaluation with:
+
+```powershell
+.\.venv\Scripts\python.exe -m evals.eval_generator
+```
+
+It gives the generator fixed, known-good contexts from `golden/generator_goldens.json` and evaluates its answers with DeepEval's faithfulness and answer-relevancy metrics. This isolates answer generation from retrieval. It uses `GOOGLE_API_KEY` for both the app's Gemini generator and DeepEval judge, and waits between cases to reduce rate-limit errors.
+
+### Evaluating the full RAG pipeline
+Run the end-to-end retriever-plus-generator evaluation with:
+
+```powershell
+.\.venv\Scripts\python.exe -m evals.eval_rag_pipeline
+```
+
+It retrieves live Chroma context for each question, generates an answer using that context, and scores contextual relevancy, faithfulness, and answer relevancy. Unlike the generator-only evaluation, this tests retrieval and generation together.
+
+### Additional evaluations
+All evaluation modules live under `evals/` and run from the project root:
+
+```powershell
+.\.venv\Scripts\python.exe -m evals.eval_toxicity
+.\.venv\Scripts\python.exe -m evals.eval_scope
+.\.venv\Scripts\python.exe -m evals.eval_latency
+.\.venv\Scripts\python.exe -m evals.eval_reliability
+```
+
+Toxicity and scope use DeepEval judges and therefore make Gemini API calls. Latency and reliability exercise the live retriever/generator without a judge; latency reports end-to-end, retrieval, and generation timing. The app does not stream answers, so it cannot measure TTFT. Reliability uses a single retry for non-rate-limit failures; rate-limit errors are not retried because another immediate request would not resolve quota exhaustion. These scripts use small demo question sets; expand them and choose suitable latency/reliability sample counts before treating results as representative.
+
+### Evaluating cost
+Run the token and generation-cost estimate with:
+
+```powershell
+.\.venv\Scripts\python.exe -m evals.eval_cost
+```
+
+This uses the real retriever context and the same prompt/model as application Q&A, then reads token usage from the Gemini response. It makes live generation calls (one per `golden/application_goldens.json` case) and waits between them. The estimate excludes embedding/retrieval, evaluation judges, and other provider charges. Prices are intentionally not hardcoded: set `GEMINI_INPUT_USD_PER_1M` and `GEMINI_OUTPUT_USD_PER_1M` in `.env` to current model rates to calculate a cost. Optionally set `GEMINI_CACHED_INPUT_USD_PER_1M`; otherwise cached input tokens are conservatively charged at the regular input rate. Without input/output prices the script reports tokens only.
+
+### Evaluating application quality
+Run correctness, completeness, and style checks against live RAG answers:
+
+```powershell
+.\.venv\Scripts\python.exe -m evals.eval_application
+```
+
+The demo cases are in `golden/application_goldens.json`. This calls the retriever and generator for each case and then uses a Gemini judge, so it requires `GOOGLE_API_KEY`, consumes API quota, and should not be treated as an offline/no-network test.
+
+### Evaluating leakage
+Run prompt-instruction, source-content, and PII leakage checks with:
+
+```powershell
+.\.venv\Scripts\python.exe -m evals.eval_leakage
+```
+
+The demo adversarial questions are in `golden/leakage_goldens.json`. Answers are generated by the live RAG pipeline; DeepEval's Gemini judge evaluates prompt/content handling and its PII metric checks generated answers. This also makes live API calls and requires `GOOGLE_API_KEY`. These small examples are demonstrations, not a security guarantee.
+
 ## Notes on behavior
 
 - The app is optimized for meeting-style transcripts and spoken content.
 - The RAG layer filters clearly irrelevant personal chatter or social remarks so that answers stay focused on business context.
 - Gemini rate limits may occur under heavy usage; the app includes retry logic and a rate-limit check.
-- If YouTube content is private, region-blocked, or unsupported, download may fail.
-- YouTube may block requests from cloud-hosted IP addresses. Caption retrieval and audio download are best-effort on Render; when both are blocked, upload the media file instead.
 
 ## Deployment
 
@@ -195,7 +256,7 @@ This makes it suitable for deployment on Render or similar Python hosting platfo
 ## Example usage
 
 1. Open the app in the browser
-2. Paste a YouTube URL or upload a local video/audio file
+2. Upload a PDF, or a local video/audio file
 3. Select a language preference
 4. Press `Start Analysis`
 5. Review the generated summary, action items, decisions, and Q&A output
@@ -233,4 +294,4 @@ Potential next improvements include:
 
 ## Summary
 
-RAGMesh is a practical AI meeting assistant that turns spoken content into actionable knowledge. It combines transcription, summarization, extraction, and retrieval to make video and audio data searchable and easy to understand.
+RAGMesh is a practical assistant that turns uploaded documents and spoken content into actionable knowledge. It combines document extraction, transcription, summarization, and retrieval to make the source material searchable and easy to understand.

@@ -1,0 +1,13 @@
+Project planning meeting
+
+The team agreed to launch the first customer beta on July 8. The beta will include the dashboard and CSV export, but not automated billing.
+
+Maya will send the vendor comparison to the team by May 12. The comparison should cover implementation time, annual cost, and data residency.
+
+The approved budget for the first phase is $18,000. The team will not exceed that amount without approval from the finance lead.
+
+Omar owns the security review and will finish it by May 20. The review must include access controls, dependency scanning, and the incident response checklist.
+
+Priya will prepare the customer support guide by June 2. The guide should include account setup, password reset, and how to report a bug.
+
+The team decided to retain uploaded meeting recordings for 90 days, then delete them. The transcript and summary can remain available after the recording is deleted.

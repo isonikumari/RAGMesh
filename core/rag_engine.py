@@ -1,4 +1,3 @@
-import os
 import re
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -7,12 +6,37 @@ from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 
 from core.vector_store import build_vector_store, get_retriever, get_collection_name, ensure_vector_store
 from core.mistral import get_mistral_llm, is_rate_limit_error
+from dotenv import load_dotenv
+load_dotenv()
 
 def get_llm():
   return get_mistral_llm(temperature=0.4)
 
 def format_docs(docs):
   return "\n\n".join([doc.page_content for doc in docs ])
+
+def build_answer_prompt():
+  return ChatPromptTemplate.from_messages([
+    ("system", """You are an expert content assistant. Answer the user's question using only the relevant source summary/context provided below.
+      Ignore unrelated personal chatter, appearance comments, insults, gossip, or social remarks that are not part of the business discussion.
+      If the answer is a number, date, amount, or percentage, return the exact value from the summary without replacing it with X or a generic placeholder.
+      If the answer is not present in the provided summary, say it is not present in the current summary.
+      Always be concise and precise. If quoting someone, mention it clearly.
+      Context from the meeting summary:
+      {context}"""),
+    ("human", "{question}")
+  ])
+
+
+def _build_answer_chain():
+  return build_answer_prompt() | get_llm() | StrOutputParser()
+
+
+def generate_answer(question: str, context: list[str]) -> str:
+  return _build_answer_chain().invoke({
+    "context": "\n\n".join(context),
+    "question": question,
+  })
 
 
 def sanitize_meeting_context(text: str) -> str:
@@ -45,23 +69,9 @@ def build_rag_chain(transcript:str):
   cleaned_transcript = sanitize_meeting_context(transcript)
   vector_store=build_vector_store(cleaned_transcript)
   retriever=get_retriever(vector_store,k=10)
-  llm=get_llm()
-
-  prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are an expert content assistant. Answer the user's question using only the relevant source summary/context provided below.
-      Ignore unrelated personal chatter, appearance comments, insults, gossip, or social remarks that are not part of the business discussion.
-      If the answer is a number, date, amount, or percentage, return the exact value from the summary without replacing it with X or a generic placeholder.
-      If the answer is not present in the provided summary, say it is not present in the current summary.
-      Always be concise and precise. If quoting someone, mention it clearly.
-      Context from the meeting summary:
-      {context}"""),
-    ("human", "{question}")
-  ])
-
-
   rag_chain = (
     {"context": retriever | RunnableLambda(format_docs),
-     "question": RunnablePassthrough()} | prompt | llm | StrOutputParser()
+     "question": RunnablePassthrough()} | _build_answer_chain()
   )
 
   return rag_chain
@@ -75,22 +85,9 @@ def load_rag_chain(transcript: str | None = None):
   vector_store = ensure_vector_store(cleaned_transcript, collection_name)
   retriever = get_retriever(vector_store)
 
-  llm = get_llm()
-
-  prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are an expert content assistant. Answer the user's question using only the relevant source summary/context provided below.
-      Ignore unrelated personal chatter, appearance comments, insults, gossip, or social remarks that are not part of the business discussion.
-      If the answer is a number, date, amount, or percentage, return the exact value from the summary without replacing it with X or a generic placeholder.
-      If the answer is not present in the provided summary, say it is not present in the current summary.
-      Always be concise and precise. If quoting someone, mention it clearly.
-      Context from the meeting summary:
-      {context}"""),
-    ("human", "{question}")
-  ])
-
   rag_chain = (
     {"context": retriever | RunnableLambda(format_docs),
-     "question": RunnablePassthrough()} | prompt | llm | StrOutputParser()
+     "question": RunnablePassthrough()} | _build_answer_chain()
   )
   return rag_chain
 

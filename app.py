@@ -51,19 +51,6 @@ def run_pipeline(source: str, language: str = "english") -> dict:
 
         transcript = extract_pdf_text(source, progress_callback=update_pdf_progress)
         st.success("PDF text extracted.")
-    elif source.startswith(("https://", "http://")):
-        from utils.youtube_transcript import fetch_youtube_transcript
-
-        st.info("Checking whether this YouTube video has captions...")
-        transcript = fetch_youtube_transcript(
-            source,
-            translate_to_english=(language != "english"),
-        )
-        if transcript:
-            st.success("YouTube captions retrieved.")
-        else:
-            st.info("Captions could not be accessed; trying to download and transcribe the audio.")
-
     if not transcript:
         chunks = process_input(source)
         transcript = transcribe_all(chunks, translate=(language != "english"))
@@ -236,71 +223,37 @@ st.markdown(
     """
     <div class="app-header">
         <h1>🎥 AI Meeting Assistant</h1>
-        <p>Turn videos, audio, and PDFs into summaries, key information, action items, and instant answers.</p>
+        <p>Analyze documents and local audio or video files, then ask questions about their content.</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-source_type = "Paste YouTube link"
-
-youtube_url = ""
 uploaded_file = None
 
-source_type = st.radio(
-    "Select input type",
-    ["Paste YouTube link", "Upload file"],
-    horizontal=True,
-    help="Choose whether you want to paste a YouTube URL or upload an audio, video, or PDF file from your computer.",
+uploaded_file = st.file_uploader(
+    "Upload a document, audio, or video file",
+    type=["pdf", "mp4", "mp3", "wav", "m4a", "mov", "avi", "webm", "mpeg", "ogg"],
+    help="Upload a PDF with selectable text or a local audio/video file to analyze.",
 )
-
-if source_type == "Paste YouTube link":
-    youtube_url = st.text_input(
-        "YouTube URL",
-        placeholder="https://www.youtube.com/watch?v=...",
-        help="Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    )
-    st.caption(
-        "The app tries captions first, then audio download. YouTube may block either "
-        "request from Render; if so, upload the media file instead."
-    )
-else:
-    uploaded_file = st.file_uploader(
-        "Upload audio, video, or PDF file",
-        type=["mp4", "mp3", "wav", "m4a", "mov", "avi", "webm", "mpeg", "ogg", "pdf"],
-        help="Upload audio/video for transcription or a PDF with selectable text for document analysis.",
-    )
 
 language = st.selectbox("Language", ["english", "hindi", "other"])
 process_button = st.button("Start Analysis", use_container_width=True, type="primary")
 
 with st.sidebar:
     st.title("⚙️ Settings")
-    st.caption("Use the main section above to enter a link or upload a file.")
+    st.caption("Upload a document or local media file to get started.")
 
 
 if process_button:
     final_source = None
 
-    if source_type == "Paste YouTube link":
-        if not youtube_url.strip():
-            st.warning("Please paste a valid YouTube URL.")
-            st.stop()
-        from utils.youtube_transcript import extract_youtube_video_id
+    if uploaded_file is None:
+        st.warning("Please upload a document, audio, or video file.")
+        st.stop()
+    final_source = save_uploaded_file(uploaded_file)
 
-        try:
-            extract_youtube_video_id(youtube_url)
-        except ValueError as exc:
-            st.warning(str(exc))
-            st.stop()
-        final_source = youtube_url.strip()
-    else:
-        if uploaded_file is None:
-            st.warning("Please upload a local video or audio file.")
-            st.stop()
-        final_source = save_uploaded_file(uploaded_file)
-
-    with st.spinner("Processing your video and generating results..."):
+    with st.spinner("Processing your file and generating results..."):
         try:
             result = run_pipeline(final_source, language)
         except Exception as exc:
@@ -316,15 +269,6 @@ if process_button:
 
             if isinstance(exc, PDFExtractionError):
                 st.error(str(exc))
-                st.stop()
-            from utils.audio_processor import YouTubeDownloadError
-
-            if isinstance(exc, YouTubeDownloadError):
-                st.error(str(exc))
-                st.info(
-                    "You can still analyze this content by selecting "
-                    "'Upload local file' and choosing an audio/video file."
-                )
                 st.stop()
             raise
 
@@ -362,7 +306,7 @@ if "pipeline_result" in st.session_state:
 
     st.markdown("""
         <div class="panel">
-            <h3>💬 Ask a question about the video</h3>
+            <h3>💬 Ask a question about the uploaded content</h3>
         </div>
     """, unsafe_allow_html=True)
 
@@ -374,7 +318,7 @@ if "pipeline_result" in st.session_state:
             with st.chat_message("assistant"):
                 st.write(message["content"])
 
-    user_question = st.chat_input("Ask a question about the transcript")
+    user_question = st.chat_input("Ask a question about this content")
     if user_question:
         from core.rag_engine import ask_question
 

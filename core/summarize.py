@@ -1,11 +1,12 @@
 from collections.abc import Callable
 
+from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 import os
-
+load_dotenv()
 from core.mistral import get_mistral_llm
 
 def get_llm():

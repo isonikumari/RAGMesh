@@ -3,6 +3,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 import os
 from core.mistral import get_mistral_llm
+from dotenv import load_dotenv
+load_dotenv()
 
 def get_llm():
     return get_mistral_llm(temperature=0.2)

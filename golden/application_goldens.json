@@ -1,0 +1,26 @@
+[
+  {
+    "query": "When does the first customer beta launch, and what is excluded?",
+    "ideal_answer": "The first customer beta launches on July 8. Automated billing is excluded."
+  },
+  {
+    "query": "Who will provide the vendor comparison and when is it due?",
+    "ideal_answer": "Maya will send the vendor comparison by May 12."
+  },
+  {
+    "query": "What is the approved first-phase budget?",
+    "ideal_answer": "The approved first-phase budget is $18,000."
+  },
+  {
+    "query": "Who owns the security review, what is its deadline, and what should it cover?",
+    "ideal_answer": "Omar owns the security review, due May 20. It must cover access controls, dependency scanning, and the incident response checklist."
+  },
+  {
+    "query": "What does Priya need to prepare, and by when?",
+    "ideal_answer": "Priya will prepare the customer support guide by June 2."
+  },
+  {
+    "query": "How long are uploaded recordings kept, and what happens afterward?",
+    "ideal_answer": "Uploaded meeting recordings are retained for 90 days and then deleted. The transcript and summary can remain available."
+  }
+]
